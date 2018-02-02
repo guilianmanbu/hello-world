@@ -1,0 +1,33 @@
+UGUI核心是EventSystem，它继承自UIBehaviour，在Update周期函数中根据输入数据，调用底层2D、3D的射线检测产生相交结果，同时根据输入按钮的状态而生成各种事件，
+事件包装成PointerEventData,而后再通过EventSystem向实现了对应响应接口的对象派发。
+所以整体流程就是：输入模块-> 输入数据包装 -> 射线检测（3D、2D、Graphic）-> 相交结果 -> EventSystem事件派发
+
+《GraphicRegistry》
+GraphicRegistry 图形注册器，记录了每个Canvas下的所有Graphic，每个Graphic实例在 OnEnable周期函数中向GraphicRegistry注册自己所属的Canvas，在OnDisable中
+向GraphicRegistry注销。
+
+《CanvasUpdateRegistr》
+图形刷新注册器。单例。其内维持两个队列，其一是布局重建队列，其二是图形重建队列。
+重建事件由Canvas类的静态事件：willRenderCanvases触发。 CanvasUpdateRegistry在其构造器中向Canvas注册该事件监听。
+重建流程： 清除无效CanvasElement（null） -> 布局重建 -> 裁剪 -> 图形重建
+
+
+《Graphic》
+抽象类，继承自UIBehaviour.实现了接口ICanvasElement。 使用时同时需要CanvasRenderer组件。
+成员包含：SetDirty方法作用当网格、布局、材质发生修改时将自身提交给CanvasUpdateRegistry的重绘队列，等待重绘.
+Rebuild方法中处理如何更新网格、材质.
+DoMeshGeneration()方法生成网格，修改网格，并将最终网格提交给CanvasRenderer。
+OnPopulateMesh(VertexHelper vh)方法填充原始网格顶点数据。
+Raycast()方法过滤是否要响应射线。
+在OnEnable（）方法中会向GraphicRegistry注册自己所属的Canvas。然后在OnDisable中注销。注册所属Canvas的一个用处就是将来GraphicRaycaster进行检测时，会依据Canvas取得所要
+检测的目标。
+在OnEnable中同时会向CanvasUpdateRegistry注册自身，注册两点：LayoutRebuild和GraphicRebuild。于OnDisabled中注销。渲染绘制时引擎通过Canvas的静态事件接口触发WillRender事件，CanvasUpdateRegistry
+收到事件开始遍历注册者并调用其Rebuild()方法来重绘。
+
+
+
+《GraphicRaycaster》
+继承：BaseRaycaster->UIBehaviour
+RequireComponent（Canvas） 需要Canvas组件，这个很重要，在进行实际检测时，检测的目标群就是属于该Canvas下的所有Graphic.
+在Raycast()方法中进行检测，首先计算物理射线检测到的到游戏物体的最近距离，然后再进行图形检测，图形检测直接判断点击点是否在UI图形的矩形区域内来得到结果。其中，
+遍历的对象就是Canvas下的所有Graphic。之后再对结果进行一些条件筛选，然后流向下一步，即回到事件中心，对所有结果最终排序取首个，包装成事件数据，再处理事件。
