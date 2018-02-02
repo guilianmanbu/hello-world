@@ -1,0 +1,21 @@
+
+Input是人机交互接口的数据源。有单点、多点、加速度、罗盘、翻转、陀螺仪、定位等多种输入方式。
+
+鼠标为单点模式，虽然有左中右三键，但都是同一点，所以在StandaloneInputModule中，三键的数据是相同的，仅以键id标记是哪个键。 它取的是Input.mousePosition坐标。
+触摸可为多点模式，处理时看是否支持触摸，不支持的就同鼠标一样取鼠标坐标；支持触摸的，就取Input.touches里面每个触点的坐标。
+
+不同的输入模块（如标准的鼠标模式、触摸模式）会把从Input获得的数据包装成统一的 PointerEventData ,之后模块的处理就是将该数据向所有的监听者进行派发了。
+接下来就是如何包装和派发。
+
+
+鼠标与触摸的一点不同是对 进入退出以及移动拖拽事件的处理，鼠标一直在屏幕上，所以它是在Process中一直处理进入退出和拖拽的；而触摸只有点击屏幕才有坐标，
+所以它的进入在press中处理，它的退出release时处理，以及 在按下中处理移动、拖拽和进入退出。
+
+
+标准模式的处理流程.  刷新被选中对象（update -> 移动导向 -> 提交取消） -> 处理鼠标（按下、抬起 -> 移动（进入退出） -> 拖拽 -> 划动（当前对象））。
+触摸模式的处理流程： 不支持的就取鼠标左键一个，支持的就遍历处理每个触点。处理过程一致： 处理按下抬起 -> （按下状态）处理移动、拖拽
+
+
+RaycasterManager 管理所有的检测器。检测器基类 BaseRaycaster 在OnEnable和OnDisable中向RaycasterManager注册和注销自己。
+PhysicesRaycaster 使用Physics.RaycastAll 3D检测得到 RaycastHit[] ； Physics2DRaycaster 使用 Physics2D.RaycastAll 2D检测得到 RaycastHit2D[].然后它们将结果包装为RaycastResult.
+
